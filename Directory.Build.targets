@@ -1,0 +1,27 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Target Name="CopyToPluginFolder" AfterTargets="Build" Condition="'$(ChefRpgDir)' != ''">
+        <ItemGroup>
+            <BuiltOutput Include="$(TargetPath)" />
+            <Assets Include="Assets\**\*"/>
+            
+        </ItemGroup>
+        
+        <PropertyGroup>
+            <DestRootDir>$(ChefRpgDir)\$(ProjectName)</DestRootDir>
+        </PropertyGroup>
+
+        <Message Text="Copying $(TargetFileName) to $(DestRootDir)" Importance="high" />
+        <Copy
+                SourceFiles="@(BuiltOutput)"
+                DestinationFolder="$(DestRootDir)"
+                SkipUnchangedFiles="false"
+                OverwriteReadOnlyFiles="true" />
+
+        <Message Text="Copying Assets to $(DestRootDir)\Assets" Importance="high" />
+        <Copy
+                SourceFiles="@(Assets)"
+                DestinationFolder="$(DestRootDir)\Assets\%(RecursiveDir)"
+                SkipUnchangedFiles="false"
+                OverwriteReadOnlyFiles="true" />
+    </Target>
+</Project>
