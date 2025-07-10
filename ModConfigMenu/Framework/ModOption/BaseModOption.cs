@@ -27,39 +27,16 @@ https://github.com/spacechase0/StardewValleyMods/blob/develop/GenericModConfigMe
  */
 
 using System;
+using BepInEx;
+using BepInEx.Configuration;
 using UnityEngine;
 
 namespace ModConfigMenu.Framework.ModOption;
 
-internal abstract class BaseModOption
+public abstract class BaseModOption
 {
-    public string FieldId { get; }
-    
-    public Func<string> Name { get; }
-    
-    public Func<string> Tooltip { get; }
-    
-    public ModConfig Owner { get; } 
-
-    /** Events **/
-    
-    /// <summary>Perform any logic before the value is reset to the default</summary>
-    public abstract void PreReset();
-
-    /// <summary>Perform any logic before the value is reset to the default</summary>
-    public abstract void PostReset();
-
-    /// <summary>Perform any logic before the value is reset to the default</summary>
-    public abstract void PreSave();
-    
-    /// <summary>Perform any logic before the value is reset to the default</summary>
-    public abstract void PostSave();
-
-    /// <summary>Perform any logic before the value is reset to the default</summary>
-    public abstract void PreMenuOpened();
-    
-    /// <summary>Perform any logic before the value is reset to the default</summary>
-    public abstract void PreMenuClosed();
+    public BepInPlugin Owner { get; private set; }
+    public ConfigEntryBase ConfigEntry { get; private set; }
 
     public abstract GameObject GetUIGameObject();
     
@@ -69,14 +46,19 @@ internal abstract class BaseModOption
     /// <param name="name">The human-readable name to display</param>
     /// <param name="tooltip">The tool tip that displays when hovered</param>
     /// <param name="owner">The mod that owns this option</param>
-    protected BaseModOption(string fieldId, Func<string> name, Func<string> tooltip, ModConfig owner)
+    protected BaseModOption(BepInPlugin owner, ConfigEntryBase configEntry)
     {
-        fieldId = Guid.NewGuid().ToString("N");
-        tooltip ??= () => null;
-        
-        FieldId = fieldId;
-        Name = name;
-        Tooltip = tooltip;
         Owner = owner;
+        ConfigEntry = configEntry;
     }
+
+    public string FieldId()
+    {
+        return $"{ConfigEntry.Definition.Section}_{ConfigEntry.Definition.Key}";
+    }
+
+    public abstract void PreReset();
+    public abstract void PostReset();
+    public abstract void PreSave();
+    public abstract void PostSave();
 }

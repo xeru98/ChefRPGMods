@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
+using BepInEx.Bootstrap;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using ModConfigMenu.Framework;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using XeruUtils;
@@ -20,11 +23,13 @@ namespace ModConfigMenu
         internal static new ManualLogSource Logger;
         internal static Plugin Instance;
         internal static SpriteCache SpriteCache { get; } = new ();
-        internal static TMP_FontAsset FONT;
+        internal static TMP_FontAsset THICK_PIXEL_8PT_FONT;
+        internal static TMP_FontAsset PIXEL_FONT_7PX_FONT;
         
         internal ModConfigUI modConfigUI = new ModConfigUI();
-        private ModConfigManager modConfigManager = new ModConfigManager();
         
+        internal static List<PluginTuple> LoadedPluginsWithConfigs = new List<PluginTuple>();
+
         private void Awake()
         {
             Instance = this;
@@ -36,14 +41,42 @@ namespace ModConfigMenu
 
             // Configure patches
             Harmony.CreateAndPatchAll(typeof(StartMenuPatches));
+
+            // Create tuples of all valid plugins so we have access to both the config and the metadata
+            LoadedPluginsWithConfigs = FindPlugins()
+                .Where(PluginTuple.isValidPlugin)
+                .Select(PluginTuple.FromBaseUnityPlugin)
+                .ToList();
+            
+            // Add this to your main plugin initialization
+            if (EventSystem.current == null)
+            {
+                Plugin.Logger.LogWarning("No EventSystem found! Creating one...");
+                GameObject eventSystemObj = new GameObject("EventSystem");
+                eventSystemObj.AddComponent<EventSystem>();
+                eventSystemObj.AddComponent<StandaloneInputModule>();
+            }
+        }
+
+        /// <summary>
+        /// Use the BepInEx Chainloader to get all the configs of the mods that have been registered
+        /// </summary>
+        /// <returns></returns>
+        private List<BaseUnityPlugin> FindPlugins()
+        {
+            return Chainloader.PluginInfos.Values.Select((PluginInfo info) => info.Instance)
+                .Where((BaseUnityPlugin plugin) => plugin != null)
+                .Union(FindObjectsOfType<BaseUnityPlugin>())
+                .ToList();
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (!FONT)
+            if (!THICK_PIXEL_8PT_FONT || !PIXEL_FONT_7PX_FONT)
             {
                 TMP_FontAsset[] loadedTMPFonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
-                FONT = loadedTMPFonts.First(f => f.name == Constants.FONT_NAME);
+                THICK_PIXEL_8PT_FONT = THICK_PIXEL_8PT_FONT ? THICK_PIXEL_8PT_FONT : loadedTMPFonts.First(f => f.name == Constants.THICK_PIXEL_8PT_FONT_NAME);
+                PIXEL_FONT_7PX_FONT = PIXEL_FONT_7PX_FONT ? PIXEL_FONT_7PX_FONT : loadedTMPFonts.First(f => f.name == Constants.PIXEL_FONT_7PX_FONT_NAME);
             }
             
             if (scene.name == "100 Start Menu")
@@ -88,7 +121,7 @@ namespace ModConfigMenu
             UIHelpers.SetupRectTransform(innerTextRectTransform, AnchorPosition.Center, sizeDelta);
             
             TextMeshProUGUI innerText = innerTextObject.AddComponent<TextMeshProUGUI>();
-            UIHelpers.SetupTextMesh(innerText, FONT, Constants.PARAGRAPH_FONT_SIZE, Constants.BODY_FONT_COLOR, "Mod Settings");
+            UIHelpers.SetupTextMesh(innerText, THICK_PIXEL_8PT_FONT, Constants.PARAGRAPH_FONT_SIZE, Constants.BODY_FONT_COLOR, "Mod Settings");
 
             return modSettingsButton;
         }
@@ -96,11 +129,6 @@ namespace ModConfigMenu
         private void RegisterSprites()
         {
             SpriteCache.LoadButtonSpritesFromAssetTexture(SpriteConstants.MAIN_MENU_BUTTON_TEXTURE_FILENAME, SpriteConstants.MAIN_MENU_BUTTON_SPRITE_SLICES, Logger);
-        }
-
-        internal ModConfigManager GetModConfigManager()
-        {
-            return modConfigManager;
         }
     }
 }

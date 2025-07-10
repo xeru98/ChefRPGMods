@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -34,9 +35,9 @@ public class UIHelpers
         SetupRectTransform(rectTransform, anchorAndPivot, anchorAndPivot, anchorAndPivot, sizeDelta, anchoredPosition);
     }
 
-    public static void SetupFillRectTransform(RectTransform rectTransform)
+    public static void SetupFillRectTransform(RectTransform rectTransform, Vector2? offsetMin = null, Vector2? offsetMax = null)
     {
-        SetupRectTransform(rectTransform, AnchorPosition.BottomLeft, AnchorPosition.TopRight, AnchorPosition.Center, offsetMin: Vector2.zero, offsetMax: Vector2.zero);
+        SetupRectTransform(rectTransform, AnchorPosition.BottomLeft, AnchorPosition.TopRight, AnchorPosition.Center, offsetMin: offsetMin?? Vector2.zero, offsetMax: offsetMax?? Vector2.zero);
     }
 
     public static void SetupTextMesh(TextMeshProUGUI textMeshPro, TMP_FontAsset font, int fontSize, Color textColor, string text, TextAlignmentOptions alignment = TextAlignmentOptions.Center)
@@ -88,5 +89,46 @@ public class UIHelpers
             buttonSpriteMap.TryGetValue(ButtonState.Selected, out var selectedSprite) ? selectedSprite : null,
             buttonSpriteMap.TryGetValue(ButtonState.Disabled, out var disabledSprite) ? disabledSprite : null
         );
+    }
+    
+    /// <summary>
+    /// Gets the hypothetic width a given string takes in a given text mesh object.
+    /// Used primarily for determining sizing
+    /// </summary>
+    /// <param name="text"></param>
+    /// <returns></returns>
+    public static Vector2 GetTextSize(TextMeshProUGUI obj, string text)
+    {
+        string original = obj.text;
+        obj.text = text;
+        Vector2 preferred = obj.GetPreferredValues();
+        obj.text = original;
+        return preferred;
+    }
+
+    public static GameObject CreateDisabled(string name)
+    {
+        GameObject disabled = new GameObject(name);
+        disabled.SetActive(false);
+        return disabled;
+    }
+
+    public static GameObject CreateDisabled(string name, params Type[] components)
+    {
+        GameObject disabled = CreateDisabled(name);
+        foreach (Type component in components)
+        {
+            disabled.AddComponent(component);
+        }
+        return disabled;
+    }
+
+    public static void ActivateWithChildren(GameObject gameObject)
+    {
+        foreach (Transform child in gameObject.transform)
+        {
+            ActivateWithChildren(child.gameObject);
+        }
+        gameObject.SetActive(true);
     }
 }

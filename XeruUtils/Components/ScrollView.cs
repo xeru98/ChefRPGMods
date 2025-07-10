@@ -62,7 +62,7 @@ public class ScrollView
         viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D), typeof(Image));
         RectTransform viewportRT = viewport.GetComponent<RectTransform>();
         viewportRT.SetParent(scrollRect.transform, false);
-        UIHelpers.SetupFillRectTransform(viewportRT);
+        UIHelpers.SetupFillRectTransform(viewportRT, offsetMax: new Vector2(-(scrollbar.GetComponent<Image>().sprite.rect.width * 1.5f), 0));
         scrollRect.viewport = viewportRT;
         Image viewportImage = viewport.GetComponent<Image>();
         viewportImage.color = new Color(0, 0, 0, 0);
@@ -88,7 +88,7 @@ public class ScrollView
         scrollbarBackground.sprite = backgroundSprite;
         scrollbarBackground.color = Color.white;
         scrollbarRT.sizeDelta = new Vector2(scrollbarBackground.sprite.rect.width, 0); // had to save this until we had the background loaded
-        scrollbarRT.anchoredPosition = new Vector2(-(scrollbarBackground.sprite.rect.width / 2), 0);
+        scrollbarRT.anchoredPosition = new Vector2(-(scrollbarBackground.sprite.rect.width / 4), 0);
 
 
         // Next we set up the scroll area to bind the handle (we use offset instead of size delta here to make sure it stretches to fill the parent)

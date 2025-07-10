@@ -1,24 +1,31 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using BepInEx.Configuration;
 using ModConfigMenu.Components;
 using ModConfigMenu.Framework.ModOption;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.UI;
 using XeruUtils;
 using XeruUtils.Components;
+using Object = UnityEngine.Object;
 
 namespace ModConfigMenu.Framework;
 
 internal class ModConfigUI
 {
+    private static readonly Vector2 SAVE_RESET_BUTTON_ANCHOR_POSITION = new Vector2(26, 7);
     private GameObject startMenuWindow;
     
     private ScrollView scrollView;
     private TextMeshProUGUI titleText;
     private GameObject backButton;
-    private ModConfig currentConfig = null;
+    private PluginTuple currentPlugin = null;
+    private GameObject saveButton;
+    private GameObject resetButton;
+    
+    private readonly List<BaseModOption> modOptions = new List<BaseModOption>();
 
     public ModConfigUI()
     {
@@ -46,6 +53,8 @@ internal class ModConfigUI
         Plugin.SpriteCache.LoadSpriteFromAssetTexture(SpriteConstants.MAIN_MENU_UI_PANEL_TEXTURE_FILENAME, SpriteConstants.MAIN_MENU_UI_PANEL_SPRITE_SLICE, Plugin.Logger);
         Plugin.SpriteCache.LoadButtonSpritesFromAssetTexture(SpriteConstants.CLOSE_BUTTON_TEXTURE_FILENAME, SpriteConstants.CLOSE_BUTTON_SPRITE_SLICES, Plugin.Logger, SpriteConstants.CLOSE_BUTTON_SPRITE_CACHE_KEY);
         Plugin.SpriteCache.LoadButtonSpritesFromAssetTexture(SpriteConstants.BACK_BUTTON_TEXTURE_FILENAME, SpriteConstants.BACK_BUTTON_SPRITE_SLICES, Plugin.Logger, SpriteConstants.BACK_BUTTON_SPRITE_CACHE_KEY);
+        Plugin.SpriteCache.LoadButtonSpritesFromAssetTexture(SpriteConstants.SAVE_BUTTON_TEXTURE_FILENAME, SpriteConstants.SAVE_RESET_BUTTON_SPRITE_SLICES, Plugin.Logger);
+        Plugin.SpriteCache.LoadButtonSpritesFromAssetTexture(SpriteConstants.RESET_BUTTON_TEXTURE_FILENAME, SpriteConstants.SAVE_RESET_BUTTON_SPRITE_SLICES, Plugin.Logger);
         Plugin.SpriteCache.LoadButtonSpritesFromAssetTexture(SpriteConstants.SCROLLBAR_HANDLE_TEXTURE_FILENAME, SpriteConstants.SCROLLBAR_HANDLE_SPRITE_SLICES, Plugin.Logger);
     }
     
@@ -62,18 +71,20 @@ internal class ModConfigUI
         panel.rectTransform.sizeDelta = panel.sprite.rect.size;
         
         scrollView = new ScrollView(window, Plugin.SpriteCache.Get(SpriteConstants.SCROLLBAR_HANDLE_TEXTURE_FILENAME).ButtonSprites[ButtonState.Default], Plugin.SpriteCache.Get(SpriteConstants.SCROLLBAR_HANDLE_TEXTURE_FILENAME).ButtonSprites);
-        UIHelpers.SetupRectTransform(scrollView.Root.GetComponent<RectTransform>(), Vector2.zero, sizeDelta: new Vector2(324, 172), anchoredPosition: new Vector2(20, 16));
+        UIHelpers.SetupRectTransform(scrollView.Root.GetComponent<RectTransform>(), AnchorPosition.BottomLeft, sizeDelta: new Vector2(324, 172), anchoredPosition: new Vector2(21, 31));
         
         // Add extra panel components
         titleText = ConstructTitleText(window, Constants.DEFAULT_PANEL_TITLE);
         ConstructCloseButton(window);
         backButton = ConstructBackButton(window);
+        resetButton = ConstructResetButton(window);
+        saveButton = ConstructSaveButton(window);
         return window;
     }
     
     private void Close()
     {
-        currentConfig?.NotifyPreMenuClose();
+        currentPlugin = null; // return to the mod list on next open
         StartMenuManager startMenuManager = Object.FindObjectOfType<StartMenuManager>();
         startMenuManager.BackToFrontMenu();
     }
@@ -89,35 +100,38 @@ internal class ModConfigUI
 
         // clear any existing children
         scrollView.ClearContent();
+        modOptions.Clear();
         
         // if we have a null config then we can just load a list of all mods with configs.
-        if (currentConfig == null)
+        if (currentPlugin == null)
         {
             titleText.text = Constants.DEFAULT_PANEL_TITLE;
             backButton.SetActive(false);
-            GameObject modConfigList = ConstructModConfigList(Plugin.Instance.GetModConfigManager());
+            saveButton.GetComponent<Button>().interactable = false;
+            resetButton.GetComponent<Button>().interactable = false;
+            GameObject modConfigList = ConstructModConfigList(Plugin.LoadedPluginsWithConfigs);
             scrollView.SetContent(modConfigList);
         }
         else
         {
-            titleText.text = currentConfig.ModName;
+            titleText.text = currentPlugin.Metadata.Name;
             backButton.SetActive(true);
-            GameObject modConfigWidget = ConstructSpecificModConfigMenu(currentConfig);
+            saveButton.GetComponent<Button>().interactable = true;
+            resetButton.GetComponent<Button>().interactable = true;
+            GameObject modConfigWidget = ConstructSpecificModConfigMenu(currentPlugin);
             scrollView.SetContent(modConfigWidget);
         }
     }
 
-    private void OpenModConfigMenu(ModConfig config)
+    private void OpenModConfigMenu(PluginTuple plugin)
     {
-        currentConfig = config;
-        currentConfig.NotifyPreMenuOpen();
+        currentPlugin = plugin;
         OpenStartMenu();
     }
     
     private void ReturnToModList()
     {
-        currentConfig.NotifyPreMenuClose();
-        currentConfig = null;
+        currentPlugin = null;
         OpenStartMenu();
     }
 
@@ -158,7 +172,7 @@ internal class ModConfigUI
     {
         GameObject titleTextObj = new GameObject($"{parentWindow.name}_TitleText");
         TextMeshProUGUI textComponent = titleTextObj.AddComponent<TextMeshProUGUI>();
-        UIHelpers.SetupTextMesh(textComponent, Plugin.FONT, Constants.TITLE_FONT_SIZE, Constants.TITLE_FONT_COLOR, text);
+        UIHelpers.SetupTextMesh(textComponent, Plugin.THICK_PIXEL_8PT_FONT, Constants.TITLE_FONT_SIZE, Constants.TITLE_FONT_COLOR, text);
         
         RectTransform rectTransform = textComponent.rectTransform;
         rectTransform.SetParent(parentWindow.transform, false);
@@ -166,7 +180,27 @@ internal class ModConfigUI
         return textComponent;
     }
 
-    private GameObject ConstructModConfigList(ModConfigManager manager)
+    private GameObject ConstructResetButton(GameObject parentWindow)
+    {
+        GameObject resetButton = UIHelpers.SetupSpriteSwapButton(parentWindow, "saveButton", Plugin.SpriteCache.Get(SpriteConstants.RESET_BUTTON_TEXTURE_FILENAME).ButtonSprites);
+        RectTransform rectTransform = resetButton.GetComponent<RectTransform>();
+        UIHelpers.SetupRectTransform(rectTransform, AnchorPosition.BottomLeft, sizeDelta: SpriteConstants.BUTTON_77x16_SPRITE_SIZE, anchoredPosition: SAVE_RESET_BUTTON_ANCHOR_POSITION);
+        rectTransform.SetParent(parentWindow.transform, false);
+        resetButton.GetComponent<Button>().onClick.AddListener(OnResetClick);
+        return resetButton;
+    }
+
+    private GameObject ConstructSaveButton(GameObject parentWindow)
+    {
+        GameObject saveButton = UIHelpers.SetupSpriteSwapButton(parentWindow, "saveButton", Plugin.SpriteCache.Get(SpriteConstants.SAVE_BUTTON_TEXTURE_FILENAME).ButtonSprites);
+        RectTransform rectTransform = saveButton.GetComponent<RectTransform>();
+        UIHelpers.SetupRectTransform(rectTransform, AnchorPosition.BottomRight, sizeDelta: SpriteConstants.BUTTON_77x16_SPRITE_SIZE, anchoredPosition: SAVE_RESET_BUTTON_ANCHOR_POSITION * new Vector2(-1, 1));
+        rectTransform.SetParent(parentWindow.transform, false);
+        saveButton.GetComponent<Button>().onClick.AddListener(OnSaveClick);
+        return saveButton;
+    }
+
+    private GameObject ConstructModConfigList(List<PluginTuple> plugins)
     {
         GameObject modConfigListObj = new GameObject("ModConfigList", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
         
@@ -181,22 +215,24 @@ internal class ModConfigUI
         ContentSizeFitter contentFitter = modConfigListObj.GetComponent<ContentSizeFitter>();
         contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         
-        foreach (ModConfig modConfig in manager.GetAll())
+        // For each registered plugin we are going to create a button that opens a menu with their options
+        foreach (PluginTuple plugin in plugins)
         {
-            GameObject modConfigButton =  UIHelpers.SetupSpriteSwapButton(modConfigListObj, modConfig.ModName, Plugin.SpriteCache.Get(SpriteConstants.MAIN_MENU_BUTTON_TEXTURE_FILENAME).ButtonSprites);
+            GameObject modConfigButton =  UIHelpers.SetupSpriteSwapButton(modConfigListObj, plugin.Metadata.Name, Plugin.SpriteCache.Get(SpriteConstants.MAIN_MENU_BUTTON_TEXTURE_FILENAME).ButtonSprites);
             modConfigButton.transform.SetParent(modConfigListObj.transform, false);
             Image image = modConfigButton.GetComponent<Image>();
             
             Button button = modConfigButton.GetComponent<Button>();
-            button.onClick.AddListener(delegate { OpenModConfigMenu(modConfig); });
+            button.onClick.AddListener(delegate { OpenModConfigMenu(plugin); });
 
-            GameObject innerTextObject = new GameObject("MainMenu_ModSettingsButton_Text");
+            // Set the button text with the mod name
+            GameObject innerTextObject = new GameObject($"{plugin.Metadata.Name}_SettingsMenuButton_Text");
             innerTextObject.transform.SetParent(modConfigButton.transform, false);
             RectTransform innerTextRT = innerTextObject.AddComponent<RectTransform>();
             UIHelpers.SetupRectTransform(innerTextRT, new Vector2(0.5f, 0.5f), image.sprite.rect.size);
             innerTextRT.SetParent(modConfigButton.transform, false);
             TextMeshProUGUI innerText = innerTextObject.AddComponent<TextMeshProUGUI>();
-            UIHelpers.SetupTextMesh(innerText, Plugin.FONT, Constants.PARAGRAPH_FONT_SIZE, Constants.BODY_FONT_COLOR, modConfig.ModName);
+            UIHelpers.SetupTextMesh(innerText, Plugin.THICK_PIXEL_8PT_FONT, Constants.PARAGRAPH_FONT_SIZE, Constants.BODY_FONT_COLOR, plugin.Metadata.Name);
         }
         
         RectTransform modConfigListRT = modConfigListObj.GetComponent<RectTransform>();
@@ -207,7 +243,7 @@ internal class ModConfigUI
         return modConfigListObj;
     }
 
-    private GameObject ConstructSpecificModConfigMenu(ModConfig config)
+    private GameObject ConstructSpecificModConfigMenu(PluginTuple plugin)
     {
         GameObject modConfigObj = new GameObject("ModConfig", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
         
@@ -221,10 +257,17 @@ internal class ModConfigUI
         ContentSizeFitter contentFitter = modConfigObj.GetComponent<ContentSizeFitter>();
         contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         
-        foreach (BaseModOption option in config.Options)
+        foreach (ConfigDefinition def in plugin.Config.Keys)
         {
-            ModOptionContainer moc = new ModOptionContainer(option, false);
-            moc.Container.transform.SetParent(modConfigObj.transform, false);
+            try
+            {
+                BaseModOption modOption = ModOptionFactory.Construct(plugin.Metadata, plugin.Config[def]);
+                modOptions.Add(modOption);
+                ModOptionContainer moc = new ModOptionContainer(modOption);
+                moc.Container.transform.SetParent(modConfigObj.transform, false);
+            }
+            catch (KeyNotFoundException) {}
+            
         }
 
         RectTransform modConfigRT = modConfigObj.GetComponent<RectTransform>();
@@ -232,5 +275,29 @@ internal class ModConfigUI
         modConfigRT.pivot = new Vector2(0.5f, 1);
         
         return modConfigObj;
+    }
+
+    private void OnResetClick()
+    {
+        foreach (BaseModOption modOption in modOptions)
+        {
+            modOption.PreReset();
+            modOption.ConfigEntry.BoxedValue = modOption.ConfigEntry.DefaultValue;
+            modOption.PostReset();
+
+        }
+    }
+
+    private void OnSaveClick()
+    {
+        foreach (BaseModOption modOption in modOptions)
+        {
+            modOption.PreSave();
+        }
+        currentPlugin.Config.Save();
+        foreach (BaseModOption modOption in modOptions)
+        {
+            modOption.PostSave();
+        }
     }
 }

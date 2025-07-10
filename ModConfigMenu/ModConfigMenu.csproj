@@ -38,5 +38,9 @@
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.2" PrivateAssets="all" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="docs\img\" />
+    </ItemGroup>
+
     <Import Project="..\XeruUtils\XeruUtils.projitems" Label="Shared" />
 </Project>

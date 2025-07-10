@@ -1,5 +1,4 @@
-﻿using System;
-using BepInEx;
+﻿using BepInEx;
 
 namespace ModConfigMenu.Framework.ModOption;
 
@@ -10,6 +9,8 @@ namespace ModConfigMenu.Framework.ModOption;
 /// </summary>
 internal abstract class ReadOnlyModOption : BaseModOption
 {
+    internal string Text { get; private set;}
+    
     // Since there is no value being reset these functions do nothing
     /// <inheritdoc />
     public override void PreReset() {}
@@ -22,13 +23,10 @@ internal abstract class ReadOnlyModOption : BaseModOption
     
     /// <inheritdoc />
     public override void PostSave() {}
-    
-    /// <inheritdoc />
-    public override void PreMenuOpened() {}
-    
-    /// <inheritdoc />
-    public override void PreMenuClosed() {}
 
-    protected ReadOnlyModOption(Func<string> name, Func<string> tooltip, ModConfig owner) 
-        : base(null, name, tooltip, owner) { }
+    protected ReadOnlyModOption(BepInPlugin plugin, string text)
+        : base(plugin, null)
+    {
+        Text = text;
+    }
 }

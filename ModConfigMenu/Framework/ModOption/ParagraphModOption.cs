@@ -1,4 +1,4 @@
-﻿using System;
+﻿using BepInEx;
 using TMPro;
 using UnityEngine;
 using XeruUtils;
@@ -10,14 +10,14 @@ namespace ModConfigMenu.Framework.ModOption;
 /// </summary>
 internal class ParagraphModOption : ReadOnlyModOption
 {
-    public ParagraphModOption(Func<string> text, ModConfig owner)
-        :base(text, null, owner) {}
+    public ParagraphModOption(BepInPlugin plugin, string text)
+        :base(plugin, text) {}
 
     public override GameObject GetUIGameObject()
     {
-        GameObject gameObject = new GameObject($"{Owner.PluginMetadata.GUID}_{FieldId}_Paragraph");
+        GameObject gameObject = new GameObject($"{FieldId()}_Paragraph");
         TextMeshProUGUI textMesh = gameObject.AddComponent<TextMeshProUGUI>();
-        UIHelpers.SetupTextMesh(textMesh, Plugin.FONT, Constants.PARAGRAPH_FONT_SIZE, Constants.BODY_FONT_COLOR, Name());
+        UIHelpers.SetupTextMesh(textMesh, Plugin.THICK_PIXEL_8PT_FONT, Constants.PARAGRAPH_FONT_SIZE, Constants.BODY_FONT_COLOR, Text);
         textMesh.alignment = TextAlignmentOptions.MidlineLeft;
 
         return gameObject;

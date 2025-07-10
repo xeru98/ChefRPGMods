@@ -1,6 +1,5 @@
-﻿using System;
-using BepInEx.Logging;
-using UnityEngine;
+﻿using BepInEx;
+using BepInEx.Configuration;
 
 namespace ModConfigMenu.Framework.ModOption;
 
@@ -9,15 +8,10 @@ namespace ModConfigMenu.Framework.ModOption;
 ///  when the config is saved. Updating the mod before saving will update cachedValue
 /// </summary>
 /// <typeparam name="T"></typeparam>
-internal abstract class SimpleModOption<T> : BaseModOption
+public abstract class SimpleModOption<T> : BaseModOption
 {
-    /// <summary>The cached value read from the mod config</summary>
+    /// <summary>The cached value that is displayed in the widget pre save</summary>
     protected T CachedValue;
-    
-    protected readonly Func<T> GetValue;
-    protected readonly Action<T> SetValue;
-    
-    public Type Type => typeof(T);
 
     public virtual T Value
     {
@@ -26,27 +20,20 @@ internal abstract class SimpleModOption<T> : BaseModOption
         {
             if (!CachedValue.Equals(value))
             {
-                Owner.ChangeHandlers.ForEach(handler => handler(FieldId, value));
+                ConfigEntry.BoxedValue = value;
+                GetLatest();
             }
         }
     }
 
-    private void GetLatest()
+    protected void GetLatest()
     {
-        CachedValue = GetValue();
+        CachedValue = (T)ConfigEntry.BoxedValue;
     }
 
-    public SimpleModOption(string fieldId, 
-        Func<string> name, 
-        Func<string> tooltip, 
-        ModConfig owner, 
-        Func<T> getValue,
-        Action<T> setValue)
-        : base(fieldId, name, tooltip, owner)
+    public SimpleModOption(BepInPlugin owner, ConfigEntry<T> configEntry)
+        : base(owner, configEntry)
     {
-        GetValue = getValue;
-        SetValue = setValue;
-        
         GetLatest();
     }
 
@@ -62,16 +49,8 @@ internal abstract class SimpleModOption<T> : BaseModOption
 
     public override void PreSave()
     {
-        SetValue(CachedValue);
+        ConfigEntry.BoxedValue = CachedValue;
     }
 
     public override void PostSave() {}
-
-    public override void PreMenuOpened()
-    {
-        GetLatest();
-    }
-
-    public override void PreMenuClosed()
-    {}
 }
